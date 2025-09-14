@@ -280,6 +280,7 @@
                 <!-- DALLE-2 Card -->
                 <article class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
                     <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.dalle2.name }}</h2>
+                    <p class="text-center text-sm text-gray-500">{{ models.dalle2.when }}</p>
                     <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
                         <img
                             v-if="models.dalle2.image"
@@ -312,6 +313,7 @@
                 <!-- DALLE-3 Card -->
                 <article v-show="showDalle3" class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
                     <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.dalle3.name }}</h2>
+                    <p class="text-center text-sm text-gray-500">{{ models.dalle3.when }}</p>
                     <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
                         <img
                             v-if="models.dalle3.image"
@@ -344,6 +346,7 @@
                 <!-- Gemini Card -->
                 <article class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
                     <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.gemini.name }}</h2>
+                    <p class="text-center text-sm text-gray-500">{{ models.gemini.when }}</p>
                     <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
                         <img
                             v-if="models.gemini.image"

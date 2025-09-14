@@ -33,7 +33,8 @@ const CONFIG = {
             WAITING: { text: '待機中', class: 'bg-gray-100 text-gray-600' },
             GENERATING: { text: '生成中', class: 'bg-yellow-100 text-yellow-800' },
             COMPLETED: { text: '完了', class: 'bg-green-100 text-green-800' },
-            ERROR: { text: 'エラー', class: 'bg-red-100 text-red-800' }
+            ERROR: { text: 'エラー', class: 'bg-red-100 text-red-800' },
+            RETRYING: { text: 'リトライ中', class: 'bg-orange-100 text-orange-800' }
         }
     },
     MODES: {
@@ -303,19 +304,22 @@ createApp({
                     status: 'waiting',
                     image: null,
                     time: null,
-                    name: 'DALLE-2'
+                    name: 'DALLE-2',
+                    when: '2022年4月'
                 },
                 dalle3: {
                     status: 'waiting',
                     image: null,
                     time: null,
-                    name: 'DALLE-3'
+                    name: 'DALLE-3',
+                    when: '2023年10月'
                 },
                 gemini: {
                     status: 'waiting',
                     image: null,
                     time: null,
-                    name: 'Gemini'
+                    name: 'Gemini 2.5 Flash Image (Nano Banana)',
+                    when: '2025年8月'
                 }
             },
             isGenerating: false
@@ -624,6 +628,50 @@ createApp({
             return StorageUtils.hasSavedKeys();
         },
 
+        async retryWithBackoff(fn, maxRetries = 3, modelName = '') {
+            let lastError;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    // Update status to show retry attempt
+                    if (attempt > 1 && modelName) {
+                        const statusConfig = CONFIG.UI.STATUS.GENERATING;
+                        const statusElement = document.getElementById(`${modelName}-status`);
+                        if (statusElement) {
+                            statusElement.textContent = `リトライ中 (${attempt}/${maxRetries})`;
+                            statusElement.className = `px-3 py-1 rounded-full text-xs font-medium ${statusConfig.class}`;
+                        }
+                    }
+
+                    const result = await fn();
+                    return result;
+                } catch (error) {
+                    lastError = error;
+                    console.log(`Attempt ${attempt}/${maxRetries} failed for ${modelName}:`, error.message);
+
+                    // Don't retry for certain error types
+                    if (error.name === 'NotAllowedError' ||
+                        error.name === 'AbortError' ||
+                        error.message.includes('Invalid API key') ||
+                        error.message.includes('insufficient quota')) {
+                        console.log(`Non-retryable error for ${modelName}, stopping retries`);
+                        throw error;
+                    }
+
+                    // If this wasn't the last attempt, wait before retrying
+                    if (attempt < maxRetries) {
+                        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5s
+                        console.log(`Waiting ${delay}ms before retry ${attempt + 1} for ${modelName}`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            // All retries failed
+            console.error(`All ${maxRetries} attempts failed for ${modelName}:`, lastError);
+            throw lastError;
+        },
+
         resetResults() {
             Object.keys(this.models).forEach(key => {
                 this.models[key].status = 'waiting';
@@ -662,32 +710,33 @@ createApp({
             this.models.dalle2.status = 'generating';
 
             try {
-                let data;
-                if (this.isImageMode) {
-                    // Convert to square PNG for DALLE-2 editing requirements
-                    const pngBlob = await ImageUtils.convertToPngBlob(this.uploadedImage);
-                    data = await APIService.editOpenAIImage(
-                        this.apiKeys.openai,
-                        pngBlob,
-                        this.textPrompt,
-                        CONFIG.API.OPENAI.SIZES.DALLE2,
-                        CONFIG.API.OPENAI.MODELS.DALLE2
-                    );
-                } else {
-                    data = await APIService.generateOpenAIImage(
-                        this.apiKeys.openai,
-                        CONFIG.API.OPENAI.MODELS.DALLE2,
-                        this.textPrompt,
-                        CONFIG.API.OPENAI.SIZES.DALLE2
-                    );
-                }
+                const data = await this.retryWithBackoff(async () => {
+                    if (this.isImageMode) {
+                        // Convert to PNG for DALLE-2 editing requirements
+                        const pngBlob = await ImageUtils.convertToPngBlob(this.uploadedImage);
+                        return await APIService.editOpenAIImage(
+                            this.apiKeys.openai,
+                            pngBlob,
+                            this.textPrompt,
+                            CONFIG.API.OPENAI.SIZES.DALLE2,
+                            CONFIG.API.OPENAI.MODELS.DALLE2
+                        );
+                    } else {
+                        return await APIService.generateOpenAIImage(
+                            this.apiKeys.openai,
+                            CONFIG.API.OPENAI.MODELS.DALLE2,
+                            this.textPrompt,
+                            CONFIG.API.OPENAI.SIZES.DALLE2
+                        );
+                    }
+                }, 3, 'dalle2');
 
                 const duration = Math.round((Date.now() - startTime) / 1000);
                 this.models.dalle2.image = data.data[0].url;
                 this.models.dalle2.status = 'completed';
                 this.models.dalle2.time = duration;
             } catch (error) {
-                console.error('DALLE-2 generation failed:', error);
+                console.error('DALLE-2 generation failed after all retries:', error);
                 this.models.dalle2.status = 'error';
             }
         },
@@ -697,20 +746,22 @@ createApp({
             this.models.dalle3.status = 'generating';
 
             try {
-                const data = await APIService.generateOpenAIImage(
-                    this.apiKeys.openai,
-                    CONFIG.API.OPENAI.MODELS.DALLE3,
-                    this.textPrompt,
-                    CONFIG.API.OPENAI.SIZES.DALLE3,
-                    'standard'
-                );
+                const data = await this.retryWithBackoff(async () => {
+                    return await APIService.generateOpenAIImage(
+                        this.apiKeys.openai,
+                        CONFIG.API.OPENAI.MODELS.DALLE3,
+                        this.textPrompt,
+                        CONFIG.API.OPENAI.SIZES.DALLE3,
+                        'standard'
+                    );
+                }, 3, 'dalle3');
 
                 const duration = Math.round((Date.now() - startTime) / 1000);
                 this.models.dalle3.image = data.data[0].url;
                 this.models.dalle3.status = 'completed';
                 this.models.dalle3.time = duration;
             } catch (error) {
-                console.error('DALLE-3 generation failed:', error);
+                console.error('DALLE-3 generation failed after all retries:', error);
                 this.models.dalle3.status = 'error';
             }
         },
@@ -720,49 +771,52 @@ createApp({
             this.models.gemini.status = 'generating';
 
             try {
-                let requestBody;
-                if (this.isImageMode && this.uploadedImage) {
-                    const base64Data = ImageUtils.extractBase64Data(this.uploadedImage);
-                    requestBody = {
-                        contents: [{
-                            parts: [
-                                { text: this.textPrompt },
-                                {
-                                    inline_data: {
-                                        mime_type: "image/jpeg",
-                                        data: base64Data
+                const imageUrl = await this.retryWithBackoff(async () => {
+                    let requestBody;
+                    if (this.isImageMode && this.uploadedImage) {
+                        const base64Data = ImageUtils.extractBase64Data(this.uploadedImage);
+                        requestBody = {
+                            contents: [{
+                                parts: [
+                                    { text: `Generate the edited image: ${this.textPrompt}` },
+                                    {
+                                        inline_data: {
+                                            mime_type: "image/jpeg",
+                                            data: base64Data
+                                        }
                                     }
-                                }
-                            ]
-                        }]
-                    };
-                } else {
-                    requestBody = {
-                        contents: [{
-                            parts: [{ text: `Generate an image: ${this.textPrompt}` }]
-                        }]
-                    };
-                }
+                                ]
+                            }]
+                        };
+                    } else {
+                        requestBody = {
+                            contents: [{
+                                parts: [{ text: `Generate an image: ${this.textPrompt}` }]
+                            }]
+                        };
+                    }
 
-                const data = await APIService.generateGeminiImage(this.apiKeys.gemini, requestBody);
+                    const data = await APIService.generateGeminiImage(this.apiKeys.gemini, requestBody);
 
-                if (!data.candidates?.[0]?.content?.parts) {
-                    throw new Error('Invalid response format');
-                }
+                    if (!data.candidates?.[0]?.content?.parts) {
+                        throw new Error('Invalid response format');
+                    }
 
-                const imagePart = data.candidates[0].content.parts.find(part => part.inlineData);
-                if (!imagePart) {
-                    throw new Error('No image data in response');
-                }
+                    const imagePart = data.candidates[0].content.parts.find(part => part.inlineData);
+                    if (!imagePart) {
+                        throw new Error('No image data in response');
+                    }
 
-                const imageUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+                    return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+                }, 3, 'gemini');
+
                 const duration = Math.round((Date.now() - startTime) / 1000);
 
                 this.models.gemini.image = imageUrl;
                 this.models.gemini.status = 'completed';
                 this.models.gemini.time = duration;
             } catch (error) {
-                console.error('Gemini generation failed:', error);
+                console.error('Gemini generation failed after all retries:', error);
                 this.models.gemini.status = 'error';
             }
         }
