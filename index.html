@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DALLE-2、DALLE-3、Geminiなどの画像生成AIの結果を比較できるツール">
+    <title>画像生成AI比較サイト - AI Image Generator Comparison</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <style>
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 font-sans text-gray-800">
+    <div id="app" class="max-w-6xl mx-auto p-5">
+        <!-- Header -->
+        <header class="text-center bg-white/95 rounded-2xl p-8 mb-8 shadow-xl">
+            <h1 class="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+                画像生成AI比較サイト
+            </h1>
+            <p class="text-lg text-gray-600">DALLE-2, DALLE-3, Geminiの画像生成結果を比較できます</p>
+        </header>
+
+        <main>
+            <!-- Input Section -->
+            <section class="bg-white/95 rounded-2xl p-8 mb-8 shadow-xl" aria-label="入力セクション">
+                <!-- Mode Toggle -->
+                <fieldset class="mb-6">
+                    <legend class="sr-only">入力モード選択</legend>
+                    <div class="flex gap-4 mb-4" role="radiogroup" aria-label="入力モード">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input
+                                type="radio"
+                                name="inputMode"
+                                value="text"
+                                v-model="inputMode"
+                                class="form-radio text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                                aria-label="テキストのみモード"
+                            >
+                            <span class="ml-2 text-gray-700 font-medium">テキストのみ</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input
+                                type="radio"
+                                name="inputMode"
+                                value="image"
+                                v-model="inputMode"
+                                class="form-radio text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                                aria-label="画像とテキストモード"
+                            >
+                            <span class="ml-2 text-gray-700 font-medium">画像 + テキスト</span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <!-- Image Upload Section -->
+                <div v-show="isImageMode" class="mb-6" role="region" aria-label="画像アップロード">
+                    <label for="imageUpload" class="block font-semibold mb-3 text-gray-700">
+                        参考画像をアップロード：
+                    </label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer">
+                        <input
+                            type="file"
+                            ref="fileInput"
+                            accept="image/*"
+                            @change="handleFileUpload"
+                            class="hidden"
+                            aria-label="画像ファイル選択"
+                        >
+
+                        <!-- Upload content -->
+                        <div v-if="!uploadedImage" @click="$refs.fileInput.click()">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <p class="text-gray-600">クリックして画像を選択、またはドラッグ＆ドロップ</p>
+                            <p class="text-sm text-gray-400">PNG, JPG, GIF対応</p>
+                        </div>
+
+                        <!-- Image preview -->
+                        <div v-if="uploadedImage" class="mt-4">
+                            <img :src="uploadedImage" class="mx-auto max-h-32 rounded-lg shadow-md" alt="アップロードされた画像のプレビュー">
+                            <button
+                                @click="removeUploadedImage"
+                                class="mt-2 text-sm text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-2 py-1"
+                                aria-label="アップロード画像を削除"
+                            >
+                                画像を削除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Prompt -->
+                <div class="mb-6">
+                    <label for="textPrompt" class="block font-semibold mb-3 text-gray-700">
+                        <span>{{ promptLabel }}</span>
+                    </label>
+                    <textarea
+                        v-model="textPrompt"
+                        placeholder="例：美しい夕日の海辺の風景、リアルな写真スタイル"
+                        rows="3"
+                        class="w-full p-4 border-2 border-gray-200 rounded-xl text-base resize-y transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        aria-required="true"
+                        aria-label="画像生成プロンプト"
+                    ></textarea>
+                </div>
+
+                <!-- API Keys -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6" role="group" aria-label="APIキー入力">
+                    <div>
+                        <label for="openaiKey" class="block font-semibold mb-2 text-gray-700">
+                            OpenAI API Key:
+                        </label>
+                        <input
+                            v-model="apiKeys.openai"
+                            type="password"
+                            placeholder="sk-..."
+                            class="w-full p-3 border-2 border-gray-200 rounded-lg transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            aria-required="true"
+                            aria-label="OpenAI APIキー"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <div>
+                        <label for="geminiKey" class="block font-semibold mb-2 text-gray-700">
+                            Gemini API Key:
+                        </label>
+                        <input
+                            v-model="apiKeys.gemini"
+                            type="password"
+                            placeholder="AIza..."
+                            class="w-full p-3 border-2 border-gray-200 rounded-lg transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            aria-required="true"
+                            aria-label="Gemini APIキー"
+                            autocomplete="off"
+                        >
+                    </div>
+                </div>
+
+                <!-- Save Keys Option -->
+                <div class="mb-4">
+                    <label class="inline-flex items-center text-sm">
+                        <input v-model="saveKeys" type="checkbox" class="form-checkbox text-indigo-600">
+                        <span class="ml-2 text-gray-600">APIキーを安全に保存（永続的）</span>
+                    </label>
+                </div>
+
+                <!-- Clear Saved Keys -->
+                <div v-if="hasSavedKeys()" class="mb-4 text-center">
+                    <button
+                        @click="clearSavedKeys"
+                        class="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                        保存されたAPIキーを削除
+                    </button>
+                </div>
+
+                <!-- Generate Button -->
+                <button
+                    @click="generateImages"
+                    :disabled="!canGenerate"
+                    class="w-full p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl text-lg transition-all hover:-translate-y-1 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                    aria-label="画像を生成して比較"
+                >
+                    画像を生成して比較
+                </button>
+            </section>
+
+            <!-- Loading Indicator -->
+            <section
+                v-show="isGenerating"
+                class="text-center p-10 bg-white/95 rounded-2xl mb-8 shadow-xl"
+                role="status"
+                aria-live="polite"
+                aria-label="読み込み中"
+            >
+                <div class="w-12 h-12 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-5" aria-hidden="true"></div>
+                <p class="text-lg">画像を生成中...</p>
+            </section>
+
+            <!-- Results Section -->
+            <section
+                class="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                role="region"
+                aria-label="生成結果"
+            >
+                <!-- DALLE-2 Card -->
+                <article class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
+                    <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.dalle2.name }}</h2>
+                    <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
+                        <img
+                            v-if="models.dalle2.image"
+                            :src="models.dalle2.image"
+                            alt="DALLE-2で生成された画像"
+                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            loading="lazy"
+                        >
+                        <div v-else class="text-gray-400 italic text-center" aria-live="polite">
+                            画像がここに表示されます
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span
+                            :class="'px-3 py-1 rounded-full text-xs font-medium ' + getStatusConfig(models.dalle2.status).class"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {{ getStatusConfig(models.dalle2.status).text }}
+                        </span>
+                        <span v-if="models.dalle2.time" class="text-gray-500" aria-label="生成時間">{{ models.dalle2.time }}秒</span>
+                    </div>
+                </article>
+
+                <!-- DALLE-3 Card -->
+                <article v-show="showDalle3" class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
+                    <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.dalle3.name }}</h2>
+                    <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
+                        <img
+                            v-if="models.dalle3.image"
+                            :src="models.dalle3.image"
+                            alt="DALLE-3で生成された画像"
+                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            loading="lazy"
+                        >
+                        <div v-else class="text-gray-400 italic text-center" aria-live="polite">
+                            画像がここに表示されます
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span
+                            :class="'px-3 py-1 rounded-full text-xs font-medium ' + getStatusConfig(models.dalle3.status).class"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {{ getStatusConfig(models.dalle3.status).text }}
+                        </span>
+                        <span v-if="models.dalle3.time" class="text-gray-500" aria-label="生成時間">{{ models.dalle3.time }}秒</span>
+                    </div>
+                </article>
+
+                <!-- Gemini Card -->
+                <article class="bg-white/95 rounded-2xl p-6 shadow-xl transition-all hover:-translate-y-2 hover:shadow-2xl">
+                    <h2 class="text-center text-xl font-semibold mb-5 text-gray-700">{{ models.gemini.name }}</h2>
+                    <div class="min-h-[300px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4">
+                        <img
+                            v-if="models.gemini.image"
+                            :src="models.gemini.image"
+                            alt="Geminiで生成された画像"
+                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            loading="lazy"
+                        >
+                        <div v-else class="text-gray-400 italic text-center" aria-live="polite">
+                            画像がここに表示されます
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span
+                            :class="'px-3 py-1 rounded-full text-xs font-medium ' + getStatusConfig(models.gemini.status).class"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {{ getStatusConfig(models.gemini.status).text }}
+                        </span>
+                        <span v-if="models.gemini.time" class="text-gray-500" aria-label="生成時間">{{ models.gemini.time }}秒</span>
+                    </div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
