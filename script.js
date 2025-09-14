@@ -14,8 +14,7 @@ const CONFIG = {
             }
         },
         GEMINI: {
-            URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent',
-            FALLBACK_IMAGE: 'https://via.placeholder.com/512x512/6366f1/ffffff?text=Gemini+API+Error'
+            URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent'
         }
     },
     UI: {
@@ -103,6 +102,49 @@ const ImageUtils = {
     async base64ToBlob(dataUrl) {
         const response = await fetch(dataUrl);
         return await response.blob();
+    },
+
+    async convertToPngBlob(imageFile) {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+
+            img.onload = () => {
+                // Keep original dimensions
+                canvas.width = img.width;
+                canvas.height = img.height;
+
+                // Draw image without cropping
+                ctx.drawImage(img, 0, 0);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Failed to convert to PNG'));
+                        return;
+                    }
+
+                    // Check size limit (4MB)
+                    if (blob.size > 4 * 1024 * 1024) {
+                        reject(new Error('Image too large. DALLE-2 editing requires images under 4MB.'));
+                        return;
+                    }
+
+                    resolve(blob);
+                }, 'image/png', 0.9);
+            };
+
+            img.onerror = () => reject(new Error('Failed to load image'));
+
+            if (typeof imageFile === 'string') {
+                img.src = imageFile; // data URL
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => img.src = e.target.result;
+                reader.onerror = () => reject(new Error('Failed to read image file'));
+                reader.readAsDataURL(imageFile);
+            }
+        });
     }
 };
 
@@ -383,10 +425,11 @@ createApp({
             try {
                 let data;
                 if (this.isImageMode) {
-                    const blob = await ImageUtils.base64ToBlob(this.uploadedImage);
+                    // Convert to square PNG for DALLE-2 editing requirements
+                    const pngBlob = await ImageUtils.convertToPngBlob(this.uploadedImage);
                     data = await APIService.editOpenAIImage(
                         this.apiKeys.openai,
-                        blob,
+                        pngBlob,
                         this.textPrompt,
                         CONFIG.API.OPENAI.SIZES.DALLE2,
                         CONFIG.API.OPENAI.MODELS.DALLE2
@@ -481,7 +524,6 @@ createApp({
                 this.models.gemini.time = duration;
             } catch (error) {
                 console.error('Gemini generation failed:', error);
-                this.models.gemini.image = CONFIG.API.GEMINI.FALLBACK_IMAGE;
                 this.models.gemini.status = 'error';
             }
         }

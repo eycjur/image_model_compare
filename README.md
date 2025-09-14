@@ -1,74 +1,109 @@
-# 画像生成AI比較サイト
+# AI Image Generator Comparison Tool
 
-DALLE-2、DALLE-3、Geminiなどの画像生成AIの結果を比較できるPure JavaScriptアプリケーションです。
+A Vue.js application for comparing image generation results from DALL-E 2, DALL-E 3, and Gemini AI models side by side.
 
-## 🚀 特徴
+## 🚀 Features
 
-- **多モデル対応**: DALLE-2、DALLE-3、Gemini の同時比較
-- **2つの生成モード**:
-  - テキストプロンプトのみ
-  - 画像 + テキストプロンプト（画像編集）
-- **ドラッグ&ドロップ**: 画像ファイルの簡単アップロード
-- **リアルタイム状態**: 各モデルの生成進捗と時間表示
-- **レスポンシブデザイン**: モバイル対応
-- **依存関係なし**: Pure JavaScript + TailwindCSS CDN
+- **Multi-Model Support**: Compare DALL-E 2, DALL-E 3, and Gemini simultaneously
+- **Two Generation Modes**:
+  - Text-to-Image: Generate from text prompts only
+  - Image Editing: Upload an image + text instructions for modifications
+- **Smart Model Selection**: DALL-E 3 automatically hidden in image editing mode (not supported)
+- **Drag & Drop Upload**: Easy image file uploading with preview
+- **Real-time Status**: Live progress tracking and generation time display
+- **Secure API Key Storage**: Encrypted local storage with Web Crypto API
+- **Responsive Design**: Mobile-friendly interface
+- **Zero Build Tools**: Pure CDN-based setup
 
-## 🛠️ 技術スタック
+## 🛠️ Tech Stack
 
-- **フロントエンド**: Pure JavaScript (ES6+)
-- **スタイリング**: TailwindCSS (CDN)
-- **バンドラー**: なし（シンプル構成）
+- **Frontend**: Vue.js 3 (CDN)
+- **Styling**: TailwindCSS (CDN)
+- **Encryption**: Web Crypto API (AES-GCM)
+- **Build**: None required
 
-## 📦 セットアップ
+## 📦 Setup
 
-### クイックスタート
+### Quick Start
 
 ```bash
-# リポジトリをクローン後
+# Clone repository
+git clone <repository-url>
+cd image_model_compare
+
+# Open in browser (no server required)
 open index.html
-# または
+
+# Or serve locally (recommended for CORS)
 python3 -m http.server 8000
-# http://localhost:8000 でアクセス
+# Access at http://localhost:8000
 ```
 
-**必要なファイル:**
-- `index.html` - メインHTML
-- `script.js` - JavaScript実装
+**Required Files:**
+- `index.html` - Main HTML with Vue.js CDN
+- `script.js` - Vue.js application logic
 
-それだけです！
+That's it! No build process needed.
 
-## 🔑 使用方法
+## 🔑 Usage
 
-### APIキーの準備
+### API Key Setup
 
-1. **OpenAI API Key**: [OpenAI Platform](https://platform.openai.com/) でAPIキーを取得
-2. **Gemini API Key**: [Google AI Studio](https://makersuite.google.com/app/apikey) でAPIキーを取得
+1. **OpenAI API Key**: Get from [OpenAI Platform](https://platform.openai.com/)
+2. **Gemini API Key**: Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-### 基本的な使い方
+### Basic Usage
 
-#### 1. テキストモード
-1. プロンプト入力欄に生成したい画像の説明を入力
-2. OpenAI API KeyとGemini API Keyを入力
-3. 「画像を生成して比較」ボタンをクリック
+#### 1. Text-to-Image Mode
+1. Enter your image description in the prompt field
+2. Input both API keys
+3. Optional: Check "Save API keys securely (permanent)" to store keys
+4. Click "Generate and Compare Images"
 
-#### 2. 画像+テキストモード
-1. 「画像 + テキスト」モードを選択
-2. 参考画像をアップロード（ドラッグ&ドロップまたはクリック）
-3. 画像への変更指示をテキストで入力
-4. APIキーを入力
-5. 「画像を生成して比較」ボタンをクリック
+#### 2. Image Editing Mode
+1. Select "Image + Text" mode
+2. Upload a reference image (drag & drop or click)
+3. Enter editing instructions in the text field
+4. Input API keys (if not saved)
+5. Click "Generate and Compare Images"
 
-## ⚠️ API制限事項
+**Note**: DALL-E 3 card is automatically hidden in image editing mode as it doesn't support image editing.
 
-### CORS問題
-ブラウザから直接APIを呼び出すため、一部のAPIでCORSエラーが発生する可能性があります：
+## 🔒 API Key Security
 
-- **OpenAI API**: 基本的に動作しますが、制限がある場合があります
-- **Gemini API**: CORS制限によりエラー時はフォールバック画像を表示
+### Encrypted Storage
+- **Encryption**: AES-256-GCM using Web Crypto API
+- **Storage**: Encrypted keys stored in localStorage
+- **Duration**: Permanent (until manually deleted)
+- **Control**: User chooses whether to save keys
 
-### CORS回避方法
+### Security Features
+- Industry-standard AES-256 encryption
+- Random initialization vectors for each encryption
+- Browser-native Web Crypto API (no third-party libraries)
+- Manual deletion button for saved keys
 
-**1. ローカルサーバー起動**
+### Security Notes
+- Frontend encryption is not completely secure (JavaScript is visible)
+- Provides protection against accidental key exposure
+- For production use, consider server-side API proxy
+
+## ⚠️ API Limitations
+
+### DALL-E 2 Image Editing Requirements
+- **Format**: Automatically converts uploaded images to PNG
+- **Size Limit**: Images are checked against 4MB limit
+- **Dimensions**: Original dimensions preserved (no cropping)
+
+### CORS Issues
+Direct browser API calls may encounter CORS restrictions:
+
+- **OpenAI API**: Generally works well
+- **Gemini API**: May show fallback image on CORS errors
+
+### CORS Workarounds
+
+**1. Local Server (Recommended)**
 ```bash
 # Python
 python3 -m http.server 8000
@@ -80,55 +115,104 @@ npx serve .
 php -S localhost:8000
 ```
 
-**2. CORS無効化ブラウザ（開発用）**
+**2. CORS-Disabled Browser (Development Only)**
 ```bash
 # Chrome
 google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev"
 ```
 
-## 🔧 カスタマイズ
+## 🔧 Customization
 
-### 新しいAIモデルの追加
+### Adding New AI Models
 
-1. **CONFIG.API**に新しいAPI設定を追加
-2. **state.models**に新しいモデル状態を追加
-3. **HTML**に新しいカードを追加
-4. **JavaScript**に生成関数を追加
-
+1. **Add API Configuration**
 ```javascript
-// 例: 新しいモデル追加
 CONFIG.API.NEWMODEL = {
     URL: 'https://api.example.com/generate',
-    // ...
+    // other settings
 };
+```
 
-async function generateNewModel(prompt, isImageMode) {
-    // 実装
+2. **Add Model State**
+```javascript
+// In Vue data()
+models: {
+    newmodel: {
+        status: 'waiting',
+        image: null,
+        time: null,
+        name: 'New Model'
+    }
 }
 ```
 
-## 📁 ファイル構造
+3. **Add Generation Method**
+```javascript
+async generateNewModel() {
+    // Implementation
+}
+```
+
+4. **Add HTML Card**
+```html
+<!-- New model card in results section -->
+<article class="bg-white/95 rounded-2xl p-6 shadow-xl">
+    <!-- Card content -->
+</article>
+```
+
+## 📁 File Structure
 
 ```
 .
-├── index.html          # メインHTML（CDN使用）
-├── script.js           # JavaScript実装
-└── README.md          # このファイル
+├── index.html              # Main HTML with Vue.js
+├── script.js              # Vue.js application
+├── index-vanilla.html     # Backup vanilla version
+├── script-vanilla.js      # Backup vanilla version
+└── README.md             # This file
 ```
 
-## 🌟 Pure JavaScriptの利点
+## 🌟 Vue.js Benefits
 
-- **シンプル**: 設定ファイルやビルド不要
-- **高速**: ブラウザで直接実行
-- **軽量**: 依存関係なし
-- **理解しやすい**: 標準的なJavaScript
+- **Reactive**: Automatic UI updates on state changes
+- **Declarative**: Template-based approach
+- **Component**: Clean separation of concerns
+- **No Build**: CDN-based, no compilation required
+- **Lightweight**: Smaller codebase than vanilla JS
 
-## 🔒 セキュリティ注意事項
+## 🔄 Migration from Vanilla JS
 
-- **APIキー**: ブラウザのローカルストレージには保存しません
-- **本番環境**: APIキーをフロントエンドで直接使用することは推奨されません
-- **推奨**: 実運用時はバックエンドサーバー経由でAPI呼び出し
+The project was migrated from vanilla JavaScript to Vue.js for better maintainability:
 
-## 📄 ライセンス
+- **Before**: Manual DOM manipulation, ~15k lines
+- **After**: Reactive data binding, ~12k lines (20% reduction)
+- **Backup**: Original vanilla version preserved as `*-vanilla.*` files
 
-MIT License
+## 🆚 Model Capabilities
+
+| Feature | DALL-E 2 | DALL-E 3 | Gemini |
+|---------|----------|----------|---------|
+| Text-to-Image | ✅ | ✅ | ✅ |
+| Image Editing | ✅ | ❌ | ✅ |
+| PNG Conversion | Auto | N/A | N/A |
+| Square Crop | No | N/A | No |
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **Vue not defined**: Check if Vue.js CDN is loaded
+2. **CORS errors**: Use local server or try different browser
+3. **Large images**: DALL-E 2 has 4MB limit, automatic conversion applied
+4. **API keys not saving**: Check browser localStorage permissions
+
+### Debug Mode
+
+Open browser console to see detailed logs:
+- API key save/load operations
+- Image conversion process
+- API request/response details
+
+## 📄 License
+
+MIT License - Feel free to use and modify!

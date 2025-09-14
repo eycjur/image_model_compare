@@ -214,7 +214,12 @@
                             loading="lazy"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
-                            画像がここに表示されます
+                            <span v-if="models.dalle2.status === 'error'" class="text-red-500">
+                                生成エラー
+                            </span>
+                            <span v-else>
+                                画像がここに表示されます
+                            </span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center text-sm">
@@ -241,7 +246,12 @@
                             loading="lazy"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
-                            画像がここに表示されます
+                            <span v-if="models.dalle3.status === 'error'" class="text-red-500">
+                                生成エラー
+                            </span>
+                            <span v-else>
+                                画像がここに表示されます
+                            </span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center text-sm">
@@ -268,7 +278,12 @@
                             loading="lazy"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
-                            画像がここに表示されます
+                            <span v-if="models.gemini.status === 'error'" class="text-red-500">
+                                生成エラー
+                            </span>
+                            <span v-else>
+                                画像がここに表示されます
+                            </span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center text-sm">
