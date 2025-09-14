@@ -289,6 +289,10 @@ createApp({
             inputMode: CONFIG.MODES.TEXT,
             textPrompt: '',
             uploadedImage: null,
+            showCamera: false,
+            cameraStream: null,
+            availableCameras: [],
+            selectedCameraId: null,
             apiKeys: {
                 openai: '',
                 gemini: ''
@@ -360,6 +364,241 @@ createApp({
         removeUploadedImage() {
             this.uploadedImage = null;
             this.$refs.fileInput.value = '';
+            // Also stop camera if running
+            this.stopCamera();
+        },
+
+        async enumerateCameras() {
+            try {
+                console.log('Getting device list...');
+                const devices = await navigator.mediaDevices.enumerateDevices();
+
+                console.log('All devices found:', devices.map(d => ({
+                    kind: d.kind,
+                    label: d.label || 'No label',
+                    deviceId: d.deviceId.substring(0, 20) + '...'
+                })));
+
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                console.log(`Found ${videoDevices.length} video input devices`);
+
+                this.availableCameras = videoDevices.map((device, index) => {
+                    const label = device.label || `カメラ ${index + 1}`;
+
+                    // More comprehensive iPhone/Continuity camera detection
+                    const isIPhone = label.toLowerCase().includes('iphone') ||
+                                    label.toLowerCase().includes('continuity') ||
+                                    label.toLowerCase().includes('デスク表示') ||
+                                    label.toLowerCase().includes('desk view') ||
+                                    label.includes('iPhone') ||
+                                    label.includes('Continuity') ||
+                                    // Sometimes appears as just a generic name but has certain patterns
+                                    (label.includes('Camera') && device.deviceId.length > 50);
+
+                    console.log(`Camera ${index + 1}:`, {
+                        label,
+                        deviceId: device.deviceId.substring(0, 30) + '...',
+                        isIPhone,
+                        fullDeviceId: device.deviceId
+                    });
+
+                    return {
+                        id: device.deviceId,
+                        label,
+                        isIPhone
+                    };
+                });
+
+                console.log(`Processed ${this.availableCameras.length} cameras for UI`);
+
+                // Auto-select iPhone camera if available, otherwise select first camera
+                const iPhoneCamera = this.availableCameras.find(camera => camera.isIPhone);
+                if (iPhoneCamera) {
+                    this.selectedCameraId = iPhoneCamera.id;
+                    console.log('✅ Auto-selected iPhone camera:', iPhoneCamera.label);
+                } else if (this.availableCameras.length > 0) {
+                    this.selectedCameraId = this.availableCameras[0].id;
+                    console.log('✅ Auto-selected first camera:', this.availableCameras[0].label);
+                } else {
+                    console.warn('⚠️ No cameras available for selection');
+                }
+
+                // Additional debug: Try to detect Continuity cameras by deviceId pattern
+                const suspectedContinuity = this.availableCameras.filter(camera =>
+                    camera.id.length > 50 && !camera.isIPhone
+                );
+                if (suspectedContinuity.length > 0) {
+                    console.log('🔍 Suspected Continuity cameras (by deviceId length):', suspectedContinuity);
+                }
+
+            } catch (error) {
+                console.error('❌ Failed to enumerate cameras:', error);
+                this.availableCameras = [];
+            }
+        },
+
+        async startCamera() {
+            try {
+                // Show camera UI first
+                this.showCamera = true;
+                await this.$nextTick();
+
+                console.log('Starting camera initialization...');
+
+                // Request camera permission to enumerate devices properly
+                console.log('Requesting initial camera access...');
+                const tempStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } }
+                });
+
+                console.log('Initial camera access granted, stopping temporary stream...');
+                tempStream.getTracks().forEach(track => track.stop());
+
+                // Small delay to ensure cleanup
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Now enumerate all available cameras
+                console.log('Enumerating cameras...');
+                await this.enumerateCameras();
+
+                // Start the selected camera
+                console.log('Starting selected camera...');
+                await this.startSelectedCamera();
+
+            } catch (error) {
+                console.error('Camera initialization failed:', error);
+                this.showCamera = false;
+
+                let message = 'カメラにアクセスできませんでした。';
+                if (error.name === 'NotAllowedError') {
+                    message = 'カメラへのアクセスが拒否されました。ブラウザの設定でカメラの許可を確認してください。';
+                } else if (error.name === 'NotFoundError') {
+                    message = 'カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。';
+                } else if (error.name === 'OverconstrainedError') {
+                    message = 'カメラの設定に問題があります。別のカメラを試してください。';
+                }
+                alert(message);
+            }
+        },
+
+        async startSelectedCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                const selectedCamera = this.availableCameras.find(c => c.id === this.selectedCameraId);
+                console.log('Starting camera:', selectedCamera || 'Default camera');
+
+                // Use selected camera if available
+                if (this.selectedCameraId) {
+                    constraints.video.deviceId = { exact: this.selectedCameraId };
+                    console.log('Using specific camera with deviceId:', this.selectedCameraId.substring(0, 30) + '...');
+                } else {
+                    // Fallback to environment camera on mobile
+                    constraints.video.facingMode = 'environment';
+                    console.log('Using fallback with facingMode: environment');
+                }
+
+                console.log('Camera constraints:', constraints);
+
+                this.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('✅ Camera stream obtained successfully');
+
+                // Wait for next tick to ensure video element is rendered
+                await this.$nextTick();
+                if (this.$refs.video) {
+                    this.$refs.video.srcObject = this.cameraStream;
+                    console.log('✅ Camera stream assigned to video element');
+
+                    // Log actual video properties once metadata is loaded
+                    this.$refs.video.addEventListener('loadedmetadata', () => {
+                        console.log('📹 Video properties:', {
+                            videoWidth: this.$refs.video.videoWidth,
+                            videoHeight: this.$refs.video.videoHeight,
+                            streamActive: this.cameraStream?.active
+                        });
+                    });
+                } else {
+                    console.error('❌ Video element not found');
+                }
+
+            } catch (error) {
+                console.error('❌ Selected camera failed:', {
+                    error: error.name,
+                    message: error.message,
+                    selectedCameraId: this.selectedCameraId?.substring(0, 30) + '...'
+                });
+
+                // Try with default constraints
+                try {
+                    console.log('🔄 Trying fallback camera...');
+                    this.cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+                    });
+
+                    console.log('✅ Fallback camera stream obtained');
+
+                    await this.$nextTick();
+                    if (this.$refs.video) {
+                        this.$refs.video.srcObject = this.cameraStream;
+                        console.log('✅ Fallback camera stream assigned to video element');
+                    }
+                } catch (fallbackError) {
+                    console.error('❌ Fallback camera also failed:', fallbackError);
+                    throw fallbackError;
+                }
+            }
+        },
+
+        async switchCamera(cameraId) {
+            this.selectedCameraId = cameraId;
+            if (this.showCamera && this.cameraStream) {
+                // Stop current stream
+                this.cameraStream.getTracks().forEach(track => track.stop());
+                this.cameraStream = null;
+
+                // Start new camera stream
+                await this.startSelectedCamera();
+            }
+        },
+
+        stopCamera() {
+            if (this.cameraStream) {
+                this.cameraStream.getTracks().forEach(track => track.stop());
+                this.cameraStream = null;
+            }
+            this.showCamera = false;
+            if (this.$refs.video) {
+                this.$refs.video.srcObject = null;
+            }
+        },
+
+        capturePhoto() {
+            if (!this.cameraStream || !this.$refs.video || !this.$refs.canvas) {
+                alert('カメラが正常に動作していません。');
+                return;
+            }
+
+            const video = this.$refs.video;
+            const canvas = this.$refs.canvas;
+            const context = canvas.getContext('2d');
+
+            // Set canvas size to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Draw video frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas to data URL
+            this.uploadedImage = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Stop camera after capture
+            this.stopCamera();
         },
 
         getStatusConfig(status) {
@@ -557,5 +796,18 @@ createApp({
                 alert(CONFIG.UI.MESSAGES.NO_GEMINI_KEY);
             }
         });
+
+        // Cleanup camera on page unload
+        window.addEventListener('beforeunload', () => {
+            this.stopCamera();
+        });
+    },
+
+    beforeUnmount() {
+        // Clean up camera stream when component is destroyed
+        this.stopCamera();
+
+        // Remove event listener
+        window.removeEventListener('beforeunload', this.stopCamera);
     }
 }).mount('#app');

@@ -86,13 +86,88 @@
                         >
 
                         <!-- Upload content -->
-                        <div v-if="!uploadedImage" @click="$refs.fileInput.click()">
+                        <div v-if="!uploadedImage && !showCamera">
                             <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                                 <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
-                            <p class="text-gray-600">クリックして画像を選択、またはドラッグ＆ドロップ</p>
-                            <p class="text-sm text-gray-400">PNG, JPG, GIF対応</p>
+                            <div class="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                                <button
+                                    @click="$refs.fileInput.click()"
+                                    class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-medium hover:bg-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    📁 ファイルを選択
+                                </button>
+                                <span class="text-gray-400 text-sm">または</span>
+                                <button
+                                    @click="startCamera"
+                                    class="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                                >
+                                    📷 カメラで撮影
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-400 mt-2">PNG, JPG, GIF対応</p>
                         </div>
+
+                        <!-- Camera View -->
+                        <div v-if="showCamera && !uploadedImage" class="text-center">
+                            <!-- Camera Selection -->
+                            <div v-if="availableCameras.length > 0" class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    カメラを選択 ({{ availableCameras.length }}台検出):
+                                </label>
+                                <select
+                                    v-model="selectedCameraId"
+                                    @change="switchCamera(selectedCameraId)"
+                                    class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-md"
+                                >
+                                    <option v-for="camera in availableCameras" :key="camera.id" :value="camera.id">
+                                        {{ camera.isIPhone ? '📱 ' : '📷 ' }}{{ camera.label }}
+                                        {{ camera.isIPhone ? ' (iPhone連携)' : '' }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- No camera detected -->
+                            <div v-if="availableCameras.length === 0" class="mb-4 p-3 bg-yellow-50 rounded-lg">
+                                <p class="text-sm text-yellow-700">
+                                    カメラが検出されませんでした。ブラウザのコンソールを確認してください。
+                                </p>
+                            </div>
+
+                            <video
+                                ref="video"
+                                class="mx-auto max-w-full max-h-64 rounded-lg shadow-md mb-4"
+                                autoplay
+                                playsinline
+                            ></video>
+
+                            <!-- Camera Controls -->
+                            <div class="flex gap-3 justify-center">
+                                <button
+                                    @click="capturePhoto"
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    📸 撮影
+                                </button>
+                                <button
+                                    @click="stopCamera"
+                                    class="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    ❌ キャンセル
+                                </button>
+                            </div>
+
+                            <!-- iPhone Camera Tip -->
+                            <div v-if="availableCameras.some(camera => camera.isIPhone)" class="mt-3 p-3 bg-blue-50 rounded-lg">
+                                <p class="text-sm text-blue-700">
+                                    📱 iPhone連携カメラが利用可能です！<br>
+                                    高品質な写真撮影が可能です。
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Hidden canvas for photo capture -->
+                        <canvas ref="canvas" class="hidden"></canvas>
 
                         <!-- Image preview -->
                         <div v-if="uploadedImage" class="mt-4">
