@@ -2,6 +2,8 @@
 
 A Vue.js application for comparing image generation results from DALL-E 2, DALL-E 3, and Gemini AI models side by side.
 
+![AI Image Generator Comparison Tool interface showing the web application with input fields for text prompts and API keys, and three generated Statue of Liberty images from DALL-E 2, DALL-E 3, and Gemini AI models displayed side by side with their generation times](ai-comparison-demo.png)
+
 ## 🚀 Features
 
 - **Multi-Model Support**: Compare DALL-E 2, DALL-E 3, and Gemini simultaneously
