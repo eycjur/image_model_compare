@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="DALLE-2、DALLE-3、Geminiなどの画像生成AIの結果を比較できるツール">
     <title>画像生成AI比較サイト - AI Image Generator Comparison</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -195,7 +196,11 @@
                         class="w-full p-4 border-2 border-gray-200 rounded-xl text-base resize-y transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         aria-required="true"
                         aria-label="画像生成プロンプト"
+                        @keydown="handleTextareaKeydown"
                     ></textarea>
+                    <p class="text-sm text-gray-500 mt-2">
+                        💡 <span class="font-medium">Cmd + Enter</span> (Mac) または <span class="font-medium">Ctrl + Enter</span> (Windows/Linux) で送信
+                    </p>
                 </div>
 
                 <!-- API Keys -->
@@ -286,8 +291,10 @@
                             v-if="models.dalle2.image"
                             :src="models.dalle2.image"
                             alt="DALLE-2で生成された画像"
-                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            class="max-w-full max-h-96 object-contain rounded-xl cursor-pointer"
                             loading="lazy"
+                            @click="openModal(models.dalle2.image, models.dalle2.name)"
+                            title="クリックして拡大表示"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
                             <span v-if="models.dalle2.status === 'error'" class="text-red-500">
@@ -319,8 +326,10 @@
                             v-if="models.dalle3.image"
                             :src="models.dalle3.image"
                             alt="DALLE-3で生成された画像"
-                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            class="max-w-full max-h-96 object-contain rounded-xl cursor-pointer"
                             loading="lazy"
+                            @click="openModal(models.dalle3.image, models.dalle3.name)"
+                            title="クリックして拡大表示"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
                             <span v-if="models.dalle3.status === 'error'" class="text-red-500">
@@ -352,8 +361,10 @@
                             v-if="models.gemini.image"
                             :src="models.gemini.image"
                             alt="Geminiで生成された画像"
-                            class="max-w-full max-h-96 object-contain rounded-xl"
+                            class="max-w-full max-h-96 object-contain rounded-xl cursor-pointer"
                             loading="lazy"
+                            @click="openModal(models.gemini.image, models.gemini.name)"
+                            title="クリックして拡大表示"
                         >
                         <div v-else class="text-gray-400 italic text-center" aria-live="polite">
                             <span v-if="models.gemini.status === 'error'" class="text-red-500">
@@ -376,6 +387,38 @@
                     </div>
                 </article>
             </section>
+
+            <!-- Image Modal -->
+            <div
+                v-show="modal.isOpen"
+                class="modal-overlay"
+                @click="closeModal"
+                role="dialog"
+                aria-modal="true"
+                :aria-label="`${modal.modelName}で生成された画像の拡大表示`"
+            >
+                <div class="modal-content" @click.stop role="document">
+                    <button
+                        @click="closeModal"
+                        class="modal-close"
+                        aria-label="モーダルを閉じる"
+                        title="モーダルを閉じる (Escキーでも閉じられます)"
+                    >
+                        ✕
+                    </button>
+                    <div class="modal-image-container">
+                        <img
+                            :src="modal.imageSrc"
+                            :alt="`${modal.modelName}で生成された画像の拡大表示`"
+                            class="modal-image"
+                            loading="lazy"
+                        >
+                    </div>
+                    <div v-if="modal.modelName" class="modal-title">
+                        {{ modal.modelName }}で生成された画像
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 

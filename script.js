@@ -322,7 +322,12 @@ createApp({
                     when: '2025年8月'
                 }
             },
-            isGenerating: false
+            isGenerating: false,
+            modal: {
+                isOpen: false,
+                imageSrc: null,
+                modelName: null
+            }
         }
     },
     computed: {
@@ -819,6 +824,36 @@ createApp({
                 console.error('Gemini generation failed after all retries:', error);
                 this.models.gemini.status = 'error';
             }
+        },
+
+        openModal(imageSrc, modelName) {
+            this.modal.isOpen = true;
+            this.modal.imageSrc = imageSrc;
+            this.modal.modelName = modelName;
+            document.body.style.overflow = 'hidden';
+        },
+
+        closeModal() {
+            this.modal.isOpen = false;
+            this.modal.imageSrc = null;
+            this.modal.modelName = null;
+            document.body.style.overflow = '';
+        },
+
+        handleEscapeKey(event) {
+            if (event.key === 'Escape' && this.modal.isOpen) {
+                this.closeModal();
+            }
+        },
+
+        handleTextareaKeydown(event) {
+            // Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) to submit
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault();
+                if (this.canGenerate) {
+                    this.generateImages();
+                }
+            }
         }
     },
 
@@ -855,6 +890,9 @@ createApp({
         window.addEventListener('beforeunload', () => {
             this.stopCamera();
         });
+
+        // Add escape key listener for modal
+        document.addEventListener('keydown', this.handleEscapeKey);
     },
 
     beforeUnmount() {
@@ -863,5 +901,8 @@ createApp({
 
         // Remove event listener
         window.removeEventListener('beforeunload', this.stopCamera);
+
+        // Remove escape key listener
+        document.removeEventListener('keydown', this.handleEscapeKey);
     }
 }).mount('#app');
